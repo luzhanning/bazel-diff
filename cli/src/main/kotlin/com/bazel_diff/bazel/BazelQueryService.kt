@@ -12,6 +12,7 @@ import org.koin.core.component.inject
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.charset.StandardCharsets
 
 class BazelQueryService(
     private val workingDirectory: Path,
@@ -47,6 +48,39 @@ class BazelQueryService(
                 mutableListOf<Build.Target>().apply {
                     while (true) {
                         val target = Build.Target.parseDelimitedFrom(proto) ?: break
+                        when (target.type) {
+                            Build.Target.Discriminator.SOURCE_FILE -> {
+                                val newSourceFileName = String(target.sourceFile.name.toByteArray(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8)
+                                target = target.toBuilder()
+                                .setSourceFile(
+                                    target.sourceFile
+                                        .toBuilder()
+                                        .setName(newSourceFileName)
+                                        .build()
+                                )
+                                .build()
+                            }
+                            Build.Target.Discriminator.RULE -> {
+                                if(target.hasRule()){
+                                    val newRuleInputs = target.rule.ruleInputList.map { input ->
+                                        String(input.toByteArray(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8)
+                                    }
+                                    target = target.toBuilder()
+                                    .setRule(
+                                        target.rule
+                                            .toBuilder()
+                                            .clearRuleInput()
+                                            .addAllRuleInput(newRuleInputs)
+                                            .build()
+                                    )
+                                    .build()
+                                }
+                            }
+                            else -> {
+                                
+                            }
+                            
+                        }
                         // EOF
                         add(target)
                     }
